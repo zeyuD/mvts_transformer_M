@@ -10,6 +10,25 @@ This version solved the old Python 3.8 dependency and added support for Apple Si
 `pip install -r failsafe_requirements.txt`
 
 
+
+### Test without modifying code
+
+The major code that needs some customizations are `datasets/data.py`, `src/main.py`.
+
+It is also suggested to create your own scripts side-by-side to this repo:
+
+ParentFolder/
+│
+├── mvts_transformer_M
+│
+└── run/
+    ├── data.py             # with customizations
+    ├── main.py             # with customizations
+    ├── variables.py        # organize the variables
+    └── cust_run.py         # a script to call the main.py
+
+
+
 ### Adding your own datasets
 
 To train and evaluate on your own data, you have to add a new data class in `datasets/data.py`.
@@ -34,23 +53,3 @@ data_factory = {'weld': WeldData,
 ## Origin Paper
 This code corresponds to the [paper](https://dl.acm.org/doi/10.1145/3447548.3467401): George Zerveas et al. **A Transformer-based Framework for Multivariate Time Series Representation Learning**, in _Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery and Data Mining (KDD '21), August 14-18, 2021_.
 ArXiV version: https://arxiv.org/abs/2010.02803
-
-If you find this code or any of the ideas in the paper useful, please consider citing:
-```buildoutcfg
-@inproceedings{10.1145/3447548.3467401,
-author = {Zerveas, George and Jayaraman, Srideepika and Patel, Dhaval and Bhamidipaty, Anuradha and Eickhoff, Carsten},
-title = {A Transformer-Based Framework for Multivariate Time Series Representation Learning},
-year = {2021},
-isbn = {9781450383325},
-publisher = {Association for Computing Machinery},
-address = {New York, NY, USA},
-url = {https://doi.org/10.1145/3447548.3467401},
-doi = {10.1145/3447548.3467401},
-booktitle = {Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery &amp; Data Mining},
-pages = {2114–2124},
-numpages = {11},
-keywords = {regression, framework, multivariate time series, classification, transformer, deep learning, self-supervised learning, unsupervised learning, imputation},
-location = {Virtual Event, Singapore},
-series = {KDD '21}
-}
-```
