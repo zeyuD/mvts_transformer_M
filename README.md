@@ -11,7 +11,7 @@ This version solved the old Python 3.8 dependency and added support for Apple Si
 
 
 
-### Test without modifying code
+### Test without modifying this repo
 
 The major code that needs some customizations are `datasets/data.py`, `src/main.py`.
 
