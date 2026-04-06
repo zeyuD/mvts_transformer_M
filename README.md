@@ -5,6 +5,8 @@ This version solved the old Python 3.8 dependency and added support for Apple Si
 
 
 ## Setup
+`git clone https://github.com/zeyuD/mvts_transformer_M.git`
+
 `cd mvts_transformer_M/`
 
 `pip install -r failsafe_requirements.txt`
