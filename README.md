@@ -16,6 +16,7 @@ This version solved the old Python 3.8 dependency and added support for Apple Si
 The major code that needs some customizations are `datasets/data.py`, `src/main.py`.
 
 It is also suggested to create your own scripts side-by-side to this repo and use it as your submodule:
+
 `git submodule add https://github.com/zeyuD/mvts_transformer_M.git`
 
 ```
