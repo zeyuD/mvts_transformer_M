@@ -45,7 +45,7 @@ class Options(object):
         self.parser.add_argument('--records_file', default='./records.xls',
                                  help='Excel file keeping all records of experiments')
         # System
-        self.parser.add_argument('--console', action='store_true',
+        self.parser.add_argument('--console', default=True, action='store_true',
                                  help="Optimize printout for console output; otherwise for file")
         self.parser.add_argument('--print_interval', type=int, default=1,
                                  help='Print batch info every this many batches')

@@ -374,13 +374,13 @@ class Analyzer(object):
         hist_precision, binedges = np.histogram(precision, binedges)
         hist_recall, binedges = np.histogram(recall, binedges)
 
-        print("\n\nDistribution of classes with respect to PRECISION: ")
-        for b in range(len(binedges) - 1):
-            print("[{:.1f}, {:.1f}): {}".format(binedges[b], binedges[b + 1], hist_precision[b]))
+        # print("\n\nDistribution of classes with respect to PRECISION: ")
+        # for b in range(len(binedges) - 1):
+        #     print("[{:.1f}, {:.1f}): {}".format(binedges[b], binedges[b + 1], hist_precision[b]))
 
-        print("\n\nDistribution of classes with respect to RECALL: ")
-        for b in range(len(binedges) - 1):
-            print("[{:.1f}, {:.1f}): {}".format(binedges[b], binedges[b + 1], hist_recall[b]))
+        # print("\n\nDistribution of classes with respect to RECALL: ")
+        # for b in range(len(binedges) - 1):
+        #     print("[{:.1f}, {:.1f}): {}".format(binedges[b], binedges[b + 1], hist_recall[b]))
 
         if self.plot:
             plt.figure()
@@ -452,14 +452,14 @@ class Analyzer(object):
 
         # Analyze results
         self.total_accuracy = np.trace(ConfMatrix) / len(y_true)
-        print('Overall accuracy: {:.3f}\n'.format(self.total_accuracy))
+        # print('Overall accuracy: {:.3f}\n'.format(self.total_accuracy))
 
         # returns metrics for each class, in the same order as existing_class_names
         self.precision, self.recall, self.f1, self.support = metrics.precision_recall_fscore_support(y_true, y_pred,
                                                                                                      labels=self.existing_class_ind)
 
         # Print report
-        print(self.generate_classification_report())
+        # print(self.generate_classification_report())
 
         # Calculate average precision and recall
         self.prec_avg, self.rec_avg = self.get_avg_prec_recall(ConfMatrix, self.existing_class_names, excluded_classes)

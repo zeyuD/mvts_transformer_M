@@ -185,13 +185,13 @@ def evaluate(evaluator):
 def validate(val_evaluator, tensorboard_writer, config, best_metrics, best_value, epoch):
     """Run an evaluation on the validation set while logging metrics, and handle outcome"""
 
-    logger.info("Evaluating on validation set ...")
+    # logger.info("Evaluating on validation set ...")
     eval_start_time = time.time()
     with torch.no_grad():
         aggr_metrics, per_batch = val_evaluator.evaluate(epoch, keep_all=True)
         # aggr_metrics, per_batch, f1_avg, fnr_avg, fpr = val_evaluator.evaluate(epoch, keep_all=True)
     eval_runtime = time.time() - eval_start_time
-    logger.info("Validation runtime: {} hours, {} minutes, {} seconds\n".format(*utils.readable_time(eval_runtime)))
+    # logger.info("Validation runtime: {} hours, {} minutes, {} seconds\n".format(*utils.readable_time(eval_runtime)))
 
     global val_times
     val_times["total_time"] += eval_runtime
@@ -199,16 +199,16 @@ def validate(val_evaluator, tensorboard_writer, config, best_metrics, best_value
     avg_val_time = val_times["total_time"] / val_times["count"]
     avg_val_batch_time = avg_val_time / len(val_evaluator.dataloader)
     avg_val_sample_time = avg_val_time / len(val_evaluator.dataloader.dataset)
-    logger.info("Avg val. time: {} hours, {} minutes, {} seconds".format(*utils.readable_time(avg_val_time)))
-    logger.info("Avg batch val. time: {} seconds".format(avg_val_batch_time))
-    logger.info("Avg sample val. time: {} seconds".format(avg_val_sample_time))
+    # logger.info("Avg val. time: {} hours, {} minutes, {} seconds".format(*utils.readable_time(avg_val_time)))
+    # logger.info("Avg batch val. time: {} seconds".format(avg_val_batch_time))
+    # logger.info("Avg sample val. time: {} seconds".format(avg_val_sample_time))
 
-    print()
+    # print()
     print_str = 'Epoch {} Validation Summary: '.format(epoch)
     for k, v in aggr_metrics.items():
         tensorboard_writer.add_scalar('{}/val'.format(k), v, epoch)
         print_str += '{}: {:8f} | '.format(k, v)
-    logger.info(print_str)
+    # logger.info(print_str)
 
     if config['key_metric'] in NEG_METRICS:
         condition = (aggr_metrics[config['key_metric']] < best_value)
@@ -259,7 +259,7 @@ class BaseRunner(object):
     def evaluate(self, epoch_num=None, keep_all=True):
         raise NotImplementedError('Please override in child class')
 
-    def print_callback(self, i_batch, metrics, prefix=''):
+    def print_callback(self, i_batch, metrics, prefix='', newline=False):
 
         total_batches = len(self.dataloader)
 
@@ -271,7 +271,7 @@ class BaseRunner(object):
 
         dyn_string = template.format(*content)
         dyn_string = prefix + dyn_string
-        self.printer.print(dyn_string)
+        self.printer.print(dyn_string, newline=newline)
 
 
 class UnsupervisedRunner(BaseRunner):
@@ -318,6 +318,8 @@ class UnsupervisedRunner(BaseRunner):
             with torch.no_grad():
                 total_active_elements += len(loss)
                 epoch_loss += batch_loss.item()  # add total loss of batch
+        # Move cursor to next line after epoch finishes printing
+        print()
 
         epoch_loss = epoch_loss / total_active_elements  # average loss per element for whole epoch
         self.epoch_metrics['epoch'] = epoch_num
@@ -370,6 +372,8 @@ class UnsupervisedRunner(BaseRunner):
 
             total_active_elements += len(loss)
             epoch_loss += batch_loss  # add total loss of batch
+        # Move cursor to next line after epoch finishes printing
+        print()
 
         epoch_loss = epoch_loss / total_active_elements  # average loss per element for whole epoch
         self.epoch_metrics['epoch'] = epoch_num
@@ -389,7 +393,7 @@ class SupervisedRunner(BaseRunner):
 
         if isinstance(args[3], torch.nn.CrossEntropyLoss):
             self.classification = True  # True if classification, False if regression
-            self.analyzer = analysis.Analyzer(print_conf_mat=True)
+            self.analyzer = analysis.Analyzer(print_conf_mat=False)
         else:
             self.classification = False
 
@@ -433,6 +437,8 @@ class SupervisedRunner(BaseRunner):
             with torch.no_grad():
                 total_samples += len(loss)
                 epoch_loss += batch_loss.item()  # add total loss of batch
+        # Move cursor to next line after epoch finishes printing
+        print()
 
         epoch_loss = epoch_loss / total_samples  # average loss per sample for whole epoch
         self.epoch_metrics['epoch'] = epoch_num
@@ -468,12 +474,14 @@ class SupervisedRunner(BaseRunner):
             per_batch['IDs'].append(IDs)
 
             metrics = {"loss": mean_loss}
-            if i % self.print_interval == 0:
-                ending = "" if epoch_num is None else 'Epoch {} '.format(epoch_num)
-                self.print_callback(i, metrics, prefix='Evaluating ' + ending)
+            # if i % self.print_interval == 0:
+            #     ending = "" if epoch_num is None else 'Epoch {} '.format(epoch_num)
+            #     self.print_callback(i, metrics, prefix='Evaluating ' + ending)
 
             total_samples += len(loss)
             epoch_loss += batch_loss  # add total loss of batch
+        # Move cursor to next line after epoch finishes printing
+        print()
 
         epoch_loss = epoch_loss / total_samples  # average loss per element for whole epoch
         self.epoch_metrics['epoch'] = epoch_num
@@ -488,9 +496,10 @@ class SupervisedRunner(BaseRunner):
             targets = np.concatenate(per_batch['targets'], axis=0).flatten()
             class_names = np.arange(probs.shape[1])  # TODO: temporary until I decide how to pass class names
             metrics_dict = self.analyzer.analyze_classification(predictions, targets, class_names)
+
             # print('test1')
-            print('predictions:', predictions)
-            print('targets:', targets)
+            # print('predictions:', predictions)
+            # print('targets:', targets)
             # fpr, tpr, thresholds = sklearn.metrics.roc_curve(predictions, targets, pos_label=0)
         
             # TP, FP, TN, FN = 0, 0, 0, 0

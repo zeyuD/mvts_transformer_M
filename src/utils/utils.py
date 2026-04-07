@@ -203,10 +203,12 @@ class Printer(object):
             self.print = builtins.print
 
     @staticmethod
-    def dyn_print(data):
-        """Print things to stdout on one line, refreshing it dynamically"""
-        sys.stdout.write("\r\x1b[K" + data.__str__())
-        sys.stdout.flush()
+    def dyn_print(data, newline=False):
+        """Print things to stdout on one line and return to beginning, refreshing it dynamically"""
+        if newline:
+            print("\r" + str(data))
+        else:
+            print("\r" + str(data), end="", flush=True)
 
 
 def readable_time(time_difference):
