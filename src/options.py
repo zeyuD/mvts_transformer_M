@@ -62,8 +62,12 @@ class Options(object):
                                  help="Limit  dataset to specified smaller random sample, e.g. for rapid debugging purposes. "
                                       "If in [0,1], it will be interpreted as a proportion of the dataset, "
                                       "otherwise as an integer absolute number of samples")
+        self.parser.add_argument('--no_crop_features', type=str, nargs='*', default=None,
+                                 help="Feature names that should skip crop_time and only use interpolation. If None, all features use the default data-class behavior.")
         self.parser.add_argument('--test_only', choices={'testset', 'fold_transduction'},
                                  help='If set, no training will take place; instead, trained model will be loaded and evaluated on test set')
+        self.parser.add_argument('--pass_band', default=None, nargs=2, type=float,
+                                 help='Frequency band to be passed by the optional bandpass filter applied to the data. If not set, no filtering will be applied.')
         self.parser.add_argument('--data_class', type=str, default='weld',
                                  help="Which type of data should be processed.")
         self.parser.add_argument('--labels', type=str,
@@ -99,6 +103,22 @@ class Options(object):
                                        "                          transduction of features to other features,\n"
                                        "                          classification of entire time series,\n"
                                        "                          regression of scalar(s) for entire time series"))
+        self.parser.add_argument('--fusion_type',
+                                 type=str,
+                                 default='same_time',
+                                 choices=['same_time', 'late', 'all_time', 'feature', 'both'],
+                                 help="Multimodal fusion type: same_time, late, all_time, feature, or both."
+                            )
+        self.parser.add_argument('--use_loss_fusion',
+                                 type=str,
+                                 default='False',
+                                 help="If set, use fused loss plus auxiliary per-modality losses."
+                            )
+        self.parser.add_argument('--lambda_aux',
+                                 type=float,
+                                 default=0.2,
+                                 help="Weight for auxiliary per-modality losses when use_loss_fusion is enabled."
+                            )
         self.parser.add_argument('--masking_ratio', type=float, default=0.15,
                                  help='Imputation: mask this proportion of each variable')
         self.parser.add_argument('--mean_mask_length', type=float, default=3,
