@@ -119,6 +119,11 @@ class Options(object):
                                  default=0.2,
                                  help="Weight for auxiliary per-modality losses when use_loss_fusion is enabled."
                             )
+        self.parser.add_argument('--wandb_project',
+                                 type=str,
+                                 default=None,
+                                 help="If set, log training to this Weights & Biases project."
+                            )
         self.parser.add_argument('--masking_ratio', type=float, default=0.15,
                                  help='Imputation: mask this proportion of each variable')
         self.parser.add_argument('--mean_mask_length', type=float, default=3,
@@ -155,6 +160,16 @@ class Options(object):
                                  help=("Comma separated string of multiplicative factors to be applied to lr "
                                        "at corresponding steps specified in `lr_step`. If a single value is provided, "
                                        "it will be replicated to match the number of steps in `lr_step`."))
+        self.parser.add_argument('--lr_scheduler', choices=['step', 'cosine', 'plateau'], default='step',
+                                 help=("Learning rate schedule: 'step' multiplies lr by `lr_factor` at the epochs in `lr_step`, "
+                                       "'cosine' decays lr to `min_lr` over all epochs, "
+                                       "'plateau' multiplies lr by `lr_factor` when the validation key metric stops improving."))
+        self.parser.add_argument('--warmup_epochs', type=int, default=0,
+                                 help='Increase lr linearly from 0 to `lr` over this many epochs before the schedule starts.')
+        self.parser.add_argument('--min_lr', type=float, default=0.0,
+                                 help="Lowest learning rate reached by the 'cosine' and 'plateau' schedules.")
+        self.parser.add_argument('--lr_patience', type=int, default=5,
+                                 help="'plateau' schedule: number of validations without improvement before lr is reduced.")
         self.parser.add_argument('--batch_size', type=int, default=64,
                                  help='Training batch size')
         self.parser.add_argument('--l2_reg', type=float, default=0,

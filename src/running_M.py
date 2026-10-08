@@ -435,6 +435,10 @@ class SupervisedRunner(BaseRunner):
 
         epoch_loss = 0  # total loss of epoch
         total_samples = 0  # total samples in epoch
+        epoch_loss_fused = 0  # fused part of the loss, when the model also returns auxiliary outputs
+        epoch_loss_aux = 0  # auxiliary part of the loss (before weighting by lambda_aux)
+        epoch_grad_norm = 0  # sum over batches of the gradient norm before clipping
+        has_aux = False
 
         for i, batch in enumerate(self.dataloader):
 
@@ -474,6 +478,11 @@ class SupervisedRunner(BaseRunner):
             else:
                 loss = self.loss_module(predictions, targets)
 
+            if isinstance(predictions, dict) and len(aux_losses) > 0:
+                has_aux = True
+                epoch_loss_fused += torch.sum(loss_fused).item()
+                epoch_loss_aux += torch.sum(aux_loss).item()
+
             batch_loss = torch.sum(loss)
             mean_loss = batch_loss / len(loss)
 
@@ -487,7 +496,8 @@ class SupervisedRunner(BaseRunner):
             total_loss.backward()
 
             # torch.nn.utils.clip_grad_value_(self.model.parameters(), clip_value=1.0)
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=4.0)
+            grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=4.0)
+            epoch_grad_norm += grad_norm.item()
             self.optimizer.step()
 
             metrics = {"loss": mean_loss.item()}
@@ -504,6 +514,10 @@ class SupervisedRunner(BaseRunner):
         epoch_loss = epoch_loss / total_samples  # average loss per sample for whole epoch
         self.epoch_metrics['epoch'] = epoch_num
         self.epoch_metrics['loss'] = epoch_loss
+        self.epoch_metrics['grad_norm'] = epoch_grad_norm / len(self.dataloader)  # clipped at 4.0 when above
+        if has_aux:
+            self.epoch_metrics['loss_fused'] = epoch_loss_fused / total_samples
+            self.epoch_metrics['loss_aux'] = epoch_loss_aux / total_samples
         return self.epoch_metrics
 
     def evaluate(self, epoch_num=None, keep_all=True):
