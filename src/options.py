@@ -64,6 +64,8 @@ class Options(object):
                                       "otherwise as an integer absolute number of samples")
         self.parser.add_argument('--no_crop_features', type=str, nargs='*', default=None,
                                  help="Feature names that should skip crop_time and only use interpolation. If None, all features use the default data-class behavior.")
+        self.parser.add_argument('--no_crop_all', action='store_true',
+                                 help="If set, no feature is cropped (all features only use interpolation), regardless of --no_crop_features.")
         self.parser.add_argument('--test_only', choices={'testset', 'fold_transduction'},
                                  help='If set, no training will take place; instead, trained model will be loaded and evaluated on test set')
         self.parser.add_argument('--pass_band', default=None, nargs=2, type=float,
@@ -106,8 +108,21 @@ class Options(object):
         self.parser.add_argument('--fusion_type',
                                  type=str,
                                  default='same_time',
-                                 choices=['same_time', 'late', 'all_time', 'feature', 'both'],
-                                 help="Multimodal fusion type: same_time, late, all_time, feature, or both."
+                                 choices=['same_time', 'late', 'all_time', 'feature', 'both', 'gated'],
+                                 help="Multimodal fusion type: same_time, late, all_time, feature, both, or gated "
+                                      "(first feature alone plus a gated correction from the fused features)."
+                            )
+        self.parser.add_argument('--pretrained_model',
+                                 type=str,
+                                 default=None,
+                                 help="Model file of an earlier run. The branches of features that exist in both models "
+                                      "are copied in. '{try}' in the path is replaced by the try number."
+                            )
+        self.parser.add_argument('--freeze_features',
+                                 type=str,
+                                 nargs='*',
+                                 default=None,
+                                 help="Features whose branch is not trained and stays as loaded from --pretrained_model."
                             )
         self.parser.add_argument('--use_loss_fusion',
                                  type=str,

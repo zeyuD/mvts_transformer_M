@@ -647,6 +647,12 @@ class MultiModalTSTransformerEncoderClassiregressor(nn.Module):
             attention over all modality-time tokens
             concat sequence
             flatten classifier
+
+        "gated":
+            the first modality keeps the path of a single-modality "same_time" model
+            the other modalities only add a correction: same-time fusion -> classifier,
+            scaled by a learned gate that starts at 0
+            logits = logits_primary + gate * logits_correction
     """
 
     def __init__(
@@ -669,11 +675,14 @@ class MultiModalTSTransformerEncoderClassiregressor(nn.Module):
     ):
         super(MultiModalTSTransformerEncoderClassiregressor, self).__init__()
 
-        if fusion_type not in ['same_time', 'late', 'all_time', 'feature', 'both']:
+        if fusion_type not in ['same_time', 'late', 'all_time', 'feature', 'both', 'gated']:
             raise ValueError(
                 f"Unknown fusion_type={fusion_type}. "
-                "Choose from ['same_time', 'late', 'all_time', 'feature', 'both']."
+                "Choose from ['same_time', 'late', 'all_time', 'feature', 'both', 'gated']."
             )
+
+        # Modules kept frozen and in eval mode, see freeze_features()
+        self.frozen_modules = []
 
         self.feature_dims = feature_dims
         self.feature_names = list(feature_dims.keys())
@@ -800,6 +809,35 @@ class MultiModalTSTransformerEncoderClassiregressor(nn.Module):
             # feature path output:   [B, d_model]
             output_dim = self.num_modalities * d_model * max_len + d_model
 
+        elif self.fusion_type == 'gated':
+            # Primary path: same layers and names as a single-modality "same_time" model,
+            # so its fusion block and classifier can be loaded from such a model
+            self.primary_feature = self.feature_names[0]
+
+            self.primary_fusion_block = SameTimeCrossModalFusionBlock(
+                d_model=d_model,
+                n_heads=n_heads,
+                dropout=dropout,
+            )
+
+            self.primary_output_layer = nn.Sequential(
+                nn.Linear(d_model * max_len, d_model),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(d_model, num_classes),
+            )
+
+            # Correction path: same-time cross-modal fusion over all modalities
+            self.fusion_block = SameTimeCrossModalFusionBlock(
+                d_model=d_model,
+                n_heads=n_heads,
+                dropout=dropout,
+            )
+
+            self.feature_fusion_block = None
+            self.gate = nn.Parameter(torch.zeros(1))
+            output_dim = self.num_modalities * d_model * max_len
+
         self.output_layer = nn.Sequential(
             nn.Linear(output_dim, d_model),
             nn.GELU(),
@@ -818,6 +856,96 @@ class MultiModalTSTransformerEncoderClassiregressor(nn.Module):
         })
 
     
+    def branch_modules(self, feature_name):
+        """
+        Modules that belong to one modality only.
+        """
+        modules = [
+            self.project_inp[feature_name],
+            self.pos_enc[feature_name],
+            self.temporal_encoders[feature_name],
+            self.aux_output_layers[feature_name],
+        ]
+
+        if self.fusion_type == 'gated' and feature_name == self.primary_feature:
+            modules += [self.primary_fusion_block, self.primary_output_layer]
+
+        return modules
+
+    def freeze_features(self, feature_names):
+        """
+        Stop training the branch of each given modality and keep it in eval mode,
+        so its weights, batch-norm statistics and (absent) dropout stay as loaded.
+        """
+        for feature_name in feature_names:
+            if feature_name not in self.feature_names:
+                raise ValueError(
+                    f"Cannot freeze '{feature_name}': not one of the model's features {self.feature_names}."
+                )
+
+            for module in self.branch_modules(feature_name):
+                for param in module.parameters():
+                    param.requires_grad = False
+                self.frozen_modules.append(module)
+
+        self.train(self.training)
+
+    def train(self, mode=True):
+        super(MultiModalTSTransformerEncoderClassiregressor, self).train(mode)
+
+        for module in self.frozen_modules:
+            module.eval()
+
+        return self
+
+    def load_pretrained_branches(self, state_dict):
+        """
+        Copy the per-modality weights of a previously trained model into this one.
+        Branches are matched by feature name, everything else is left untouched.
+
+        With "gated" fusion, the fusion block and classifier of a single-modality
+        model of the primary feature are loaded into the primary path.
+
+        Returns:
+            loaded features, and whether the primary classifier was loaded
+        """
+        groups = ['project_inp', 'pos_enc', 'temporal_encoders', 'aux_output_layers']
+        source_features = sorted({key.split('.')[1] for key in state_dict if key.startswith('project_inp.')})
+
+        load_primary_head = (
+            self.fusion_type == 'gated'
+            and source_features == [self.primary_feature]
+        )
+
+        own_state = self.state_dict()
+        new_state = {}
+        loaded_features = set()
+
+        for key, value in state_dict.items():
+            target = None
+
+            for feature_name in self.feature_names:
+                if any(key.startswith(f"{group}.{feature_name}.") for group in groups):
+                    target = key
+                    loaded_features.add(feature_name)
+
+            if load_primary_head and (key.startswith('fusion_block.') or key.startswith('output_layer.')):
+                target = 'primary_' + key
+
+            if target is None:
+                continue
+
+            if target not in own_state or own_state[target].shape != value.shape:
+                raise ValueError(
+                    f"Pre-trained weight '{key}' does not fit this model (d_model, layers or sequence length differ)."
+                )
+
+            new_state[target] = value
+
+        self.load_state_dict(new_state, strict=False)
+
+        return sorted(loaded_features), load_primary_head
+
     def compute_aux_logits(self, h_dict, padding_masks):
         """
         Compute one auxiliary prediction per modality.
@@ -999,10 +1127,41 @@ class MultiModalTSTransformerEncoderClassiregressor(nn.Module):
                 dim=-1,
             )
 
+        # --------------------------------------------------
+        # Option 6: gated fusion
+        # primary modality alone + gate * cross-modal correction
+        # --------------------------------------------------
+        elif self.fusion_type == 'gated':
+            primary = self.primary_feature
+
+            h_primary = self.primary_fusion_block(
+                {primary: h_dict[primary]},
+                padding_masks,
+            )[primary]
+            h_primary = h_primary * padding_masks.unsqueeze(-1)
+            logits_primary = self.primary_output_layer(
+                h_primary.reshape(h_primary.shape[0], -1)
+            )
+
+            h_dict = self.fusion_block(h_dict, padding_masks)
+
+            for feature_name in self.feature_names:
+                h_dict[feature_name] = h_dict[feature_name] * padding_masks.unsqueeze(-1)
+
+            fused = torch.cat(
+                [h_dict[name] for name in self.feature_names],
+                dim=-1,
+            )  # [B, T, M*d_model]
+
+            fused = fused.reshape(fused.shape[0], -1)
+
         else:
             raise ValueError(f"Unknown fusion_type={self.fusion_type}")
 
         logits_fused = self.output_layer(fused)
+
+        if self.fusion_type == 'gated':
+            logits_fused = logits_primary + self.gate * logits_fused
 
         if self.use_loss_fusion and self.training:
             aux_logits = self.compute_aux_logits(
